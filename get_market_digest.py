@@ -1,5 +1,6 @@
 import yfinance as yf
 import pandas as pd
+import os
 
 # 1. Define index tickers
 indexes = {
@@ -64,3 +65,16 @@ for _, r in df_ru_gainers.iterrows():
 print("\n🔻 Top 3 Russell 2000 Losers:")
 for _, r in df_ru_losers.iterrows():
     print(f"- {r.Symbol}: {r.Price} USD, {r['Change (%)']:+.2f}%")
+
+
+# Example digest output
+digest_output = "📊 Major Indexes:\nS&P 500: 6,358.91 (+0.78%)\n..."
+
+# Save digest to docs/index.html
+with open("docs/index.html", "w", encoding="utf-8") as f:
+    f.write("<html><body>")
+    f.write("<h1>Lotusbee Market Digest</h1>")
+    f.write("<pre>")
+    f.write(digest_output)
+    f.write("</pre>")
+    f.write("</body></html>")
