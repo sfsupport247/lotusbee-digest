@@ -1,0 +1,25 @@
+name: LotusBee Daily Digest
+
+on:
+  schedule:
+    - cron: '45 20 * * 1-5'  # 4:45 PM EDT (20:45 UTC) on weekdays
+  workflow_dispatch:          # Allows manual runs from GitHub
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run LotusBee script
+        run: python get_market_digest.py
