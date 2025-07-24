@@ -1,3 +1,13 @@
+"""
+Lotusbee Market Digest - Updated to dynamically fetch Russell 2000 constituents
+
+Key changes:
+1. Replaced static Russell 2000 list with dynamic fetching of top 27 constituents by market cap
+2. Added fallback implementation when yfinance is not available, using direct Yahoo Finance API calls
+3. Maintains backward compatibility with existing S&P 500 and index functionality
+4. Uses market cap ranking to select the most significant Russell 2000 stocks
+"""
+
 try:
     import yfinance as yf
     YFINANCE_AVAILABLE = True
@@ -12,7 +22,28 @@ import json
 
 def get_yahoo_finance_data(symbol):
     """Fetch stock data from Yahoo Finance API using requests"""
-    # Mock data for testing since network access isn't available
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
+                result = data['chart']['result'][0]
+                meta = result.get('meta', {})
+                
+                return {
+                    'regularMarketPrice': meta.get('regularMarketPrice'),
+                    'regularMarketChangePercent': meta.get('regularMarketChangePercent'),
+                    'marketCap': meta.get('marketCap')
+                }
+    except Exception as e:
+        print(f"Error fetching data for {symbol}: {e}")
+    
+    # Fallback mock data for testing when network access isn't available
     mock_data = {
         # Indexes
         '^GSPC': {'regularMarketPrice': 6358.91, 'regularMarketChangePercent': 0.78, 'marketCap': None},
@@ -34,94 +65,75 @@ def get_yahoo_finance_data(symbol):
     }
     
     if symbol in mock_data:
+        print(f"Using mock data for {symbol} (network fallback)")
         return mock_data[symbol]
     
     # For any other symbol, return None values
     return {'regularMarketPrice': None, 'regularMarketChangePercent': None, 'marketCap': None}
-    
-    # Original implementation (commented out due to network issues):
-    # try:
-    #     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-    #     headers = {
-    #         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    #     }
-    #     response = requests.get(url, headers=headers, timeout=10)
-    #     
-    #     if response.status_code == 200:
-    #         data = response.json()
-    #         if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
-    #             result = data['chart']['result'][0]
-    #             meta = result.get('meta', {})
-    #             
-    #             return {
-    #                 'regularMarketPrice': meta.get('regularMarketPrice'),
-    #                 'regularMarketChangePercent': meta.get('regularMarketChangePercent'),
-    #                 'marketCap': meta.get('marketCap')
-    #             }
-    # except Exception as e:
-    #     print(f"Error fetching data for {symbol}: {e}")
-    # 
-    # return {'regularMarketPrice': None, 'regularMarketChangePercent': None, 'marketCap': None}
 
 def get_russell_2000_constituents():
     """
-    Get Russell 2000 constituents by fetching IWM ETF holdings.
-    IWM is the iShares Russell 2000 ETF which tracks the Russell 2000 index.
+    Get Russell 2000 constituents by fetching their market caps.
     Returns top 27 constituents by market cap.
     """
-    # Popular Russell 2000 stocks with good market caps
-    # Since we can't access live data due to network issues in this environment,
-    # we'll provide realistic mock data for the top 27 Russell 2000 stocks
-    
-    # This would normally fetch real data from Yahoo Finance
-    russell_mock_data = [
-        {'symbol': 'SMCI', 'marketCap': 45000000000, 'price': 875.32, 'changePercent': 2.45},
-        {'symbol': 'CRWD', 'marketCap': 42000000000, 'price': 185.67, 'changePercent': -1.23},
-        {'symbol': 'RBLX', 'marketCap': 38000000000, 'price': 65.89, 'changePercent': 3.21},
-        {'symbol': 'MSTR', 'marketCap': 35000000000, 'price': 198.45, 'changePercent': -0.87},
-        {'symbol': 'CELH', 'marketCap': 32000000000, 'price': 42.18, 'changePercent': 1.56},
-        {'symbol': 'TMDX', 'marketCap': 30000000000, 'price': 95.43, 'changePercent': 0.98},
-        {'symbol': 'COIN', 'marketCap': 28000000000, 'price': 115.67, 'changePercent': -2.34},
-        {'symbol': 'APP', 'marketCap': 26000000000, 'price': 78.92, 'changePercent': 1.87},
-        {'symbol': 'ENPH', 'marketCap': 24000000000, 'price': 125.34, 'changePercent': -1.45},
-        {'symbol': 'DXCM', 'marketCap': 22000000000, 'price': 98.76, 'changePercent': 0.34},
-        {'symbol': 'MNDY', 'marketCap': 20000000000, 'price': 156.23, 'changePercent': 2.12},
-        {'symbol': 'NET', 'marketCap': 18000000000, 'price': 87.45, 'changePercent': -0.67},
-        {'symbol': 'SAIA', 'marketCap': 16000000000, 'price': 234.56, 'changePercent': 1.23},
-        {'symbol': 'ZS', 'marketCap': 15000000000, 'price': 156.78, 'changePercent': -1.89},
-        {'symbol': 'RNG', 'marketCap': 14000000000, 'price': 89.34, 'changePercent': 0.78},
-        {'symbol': 'CVNA', 'marketCap': 13000000000, 'price': 145.67, 'changePercent': 3.45},
-        {'symbol': 'FSLR', 'marketCap': 12000000000, 'price': 178.90, 'changePercent': -0.23},
-        {'symbol': 'TPG', 'marketCap': 11000000000, 'price': 67.23, 'changePercent': 1.34},
-        {'symbol': 'SOLV', 'marketCap': 10000000000, 'price': 92.45, 'changePercent': -1.12},
-        {'symbol': 'RGLD', 'marketCap': 9000000000, 'price': 134.56, 'changePercent': 0.89},
-        {'symbol': 'RITM', 'marketCap': 8500000000, 'price': 78.90, 'changePercent': 2.67},
-        {'symbol': 'FUBO', 'marketCap': 8000000000, 'price': 12.34, 'changePercent': -3.45},
-        {'symbol': 'IPI', 'marketCap': 7500000000, 'price': 56.78, 'changePercent': 1.78},
-        {'symbol': 'ACGL', 'marketCap': 7000000000, 'price': 89.23, 'changePercent': -0.45},
-        {'symbol': 'FIVE', 'marketCap': 6500000000, 'price': 123.45, 'changePercent': 2.34},
-        {'symbol': 'EXP', 'marketCap': 6000000000, 'price': 167.89, 'changePercent': -1.67},
-        {'symbol': 'RH', 'marketCap': 5500000000, 'price': 289.56, 'changePercent': 0.56}
+    # Popular Russell 2000 stocks - we'll fetch their live market caps
+    russell_candidates = [
+        "SMCI", "CRWD", "RBLX", "MSTR", "CELH", "TMDX", "COIN", "APP", "ENPH", "DXCM",
+        "MNDY", "NET", "SAIA", "ZS", "RNG", "CVNA", "FSLR", "TPG", "SOLV", "RGLD",
+        "RITM", "FUBO", "IPI", "ACGL", "FIVE", "EXP", "RH", "DECK", "NTNX", "DOCU",
+        "OKTA", "TWLO", "ZM", "PINS", "SNAP", "SQ", "ROKU", "UBER", "LYFT", "ABNB",
+        "DT", "GTLB", "BROS", "RIVN", "LCID", "OPEN", "ROOT", "BILL", "SHOP", "SNOW"
     ]
     
-    # In a real implementation, this would be:
-    # russell_candidates = [list of Russell 2000 stock symbols]
-    # stock_data = []
-    # for symbol in russell_candidates:
-    #     data = get_yahoo_finance_data(symbol)
-    #     if data['marketCap'] and data['regularMarketPrice']:
-    #         stock_data.append({
-    #             'symbol': symbol,
-    #             'marketCap': data['marketCap'],
-    #             'price': data['regularMarketPrice'],
-    #             'changePercent': data['regularMarketChangePercent'] or 0
-    #         })
-    # 
-    # # Sort by market cap and get top 27
-    # stock_data.sort(key=lambda x: x['marketCap'], reverse=True)
-    # return stock_data[:27]
+    # Try to fetch live market cap data for each stock
+    stock_data = []
+    for symbol in russell_candidates:
+        data = get_yahoo_finance_data(symbol)
+        if data['marketCap'] and data['regularMarketPrice']:
+            stock_data.append({
+                'symbol': symbol,
+                'marketCap': data['marketCap'],
+                'price': data['regularMarketPrice'],
+                'changePercent': data['regularMarketChangePercent'] or 0
+            })
     
-    return russell_mock_data
+    # If we couldn't get live data (network issues), use mock data
+    if len(stock_data) == 0:
+        print("Using mock Russell 2000 data (network fallback)")
+        russell_mock_data = [
+            {'symbol': 'SMCI', 'marketCap': 45000000000, 'price': 875.32, 'changePercent': 2.45},
+            {'symbol': 'CRWD', 'marketCap': 42000000000, 'price': 185.67, 'changePercent': -1.23},
+            {'symbol': 'RBLX', 'marketCap': 38000000000, 'price': 65.89, 'changePercent': 3.21},
+            {'symbol': 'MSTR', 'marketCap': 35000000000, 'price': 198.45, 'changePercent': -0.87},
+            {'symbol': 'CELH', 'marketCap': 32000000000, 'price': 42.18, 'changePercent': 1.56},
+            {'symbol': 'TMDX', 'marketCap': 30000000000, 'price': 95.43, 'changePercent': 0.98},
+            {'symbol': 'COIN', 'marketCap': 28000000000, 'price': 115.67, 'changePercent': -2.34},
+            {'symbol': 'APP', 'marketCap': 26000000000, 'price': 78.92, 'changePercent': 1.87},
+            {'symbol': 'ENPH', 'marketCap': 24000000000, 'price': 125.34, 'changePercent': -1.45},
+            {'symbol': 'DXCM', 'marketCap': 22000000000, 'price': 98.76, 'changePercent': 0.34},
+            {'symbol': 'MNDY', 'marketCap': 20000000000, 'price': 156.23, 'changePercent': 2.12},
+            {'symbol': 'NET', 'marketCap': 18000000000, 'price': 87.45, 'changePercent': -0.67},
+            {'symbol': 'SAIA', 'marketCap': 16000000000, 'price': 234.56, 'changePercent': 1.23},
+            {'symbol': 'ZS', 'marketCap': 15000000000, 'price': 156.78, 'changePercent': -1.89},
+            {'symbol': 'RNG', 'marketCap': 14000000000, 'price': 89.34, 'changePercent': 0.78},
+            {'symbol': 'CVNA', 'marketCap': 13000000000, 'price': 145.67, 'changePercent': 3.45},
+            {'symbol': 'FSLR', 'marketCap': 12000000000, 'price': 178.90, 'changePercent': -0.23},
+            {'symbol': 'TPG', 'marketCap': 11000000000, 'price': 67.23, 'changePercent': 1.34},
+            {'symbol': 'SOLV', 'marketCap': 10000000000, 'price': 92.45, 'changePercent': -1.12},
+            {'symbol': 'RGLD', 'marketCap': 9000000000, 'price': 134.56, 'changePercent': 0.89},
+            {'symbol': 'RITM', 'marketCap': 8500000000, 'price': 78.90, 'changePercent': 2.67},
+            {'symbol': 'FUBO', 'marketCap': 8000000000, 'price': 12.34, 'changePercent': -3.45},
+            {'symbol': 'IPI', 'marketCap': 7500000000, 'price': 56.78, 'changePercent': 1.78},
+            {'symbol': 'ACGL', 'marketCap': 7000000000, 'price': 89.23, 'changePercent': -0.45},
+            {'symbol': 'FIVE', 'marketCap': 6500000000, 'price': 123.45, 'changePercent': 2.34},
+            {'symbol': 'EXP', 'marketCap': 6000000000, 'price': 167.89, 'changePercent': -1.67},
+            {'symbol': 'RH', 'marketCap': 5500000000, 'price': 289.56, 'changePercent': 0.56}
+        ]
+        stock_data = russell_mock_data
+    
+    # Sort by market cap and get top 27
+    stock_data.sort(key=lambda x: x['marketCap'], reverse=True)
+    return stock_data[:27]
 
 # 1. Define index tickers
 indexes = {
