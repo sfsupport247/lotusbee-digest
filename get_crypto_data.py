@@ -1,29 +1,20 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from flask import Flask, jsonify
 import requests
-from typing import List, Dict, Union, Optional
 
-# Initialize the FastAPI application
-app = FastAPI(
-    title="Cryptocurrency Price API",
-    description="API to fetch current prices and 24-hour percentage changes of selected cryptocurrencies from CoinGecko.",
-    version="1.1.0"
-)
+app = Flask(__name__)
 
-def fetch_crypto_prices() -> Union[List[Dict[str, Union[str, float, None]]], Dict[str, str]]:
+def fetch_crypto_data(crypto_ids):
     """
-    Fetches the current prices and 24-hour percentage changes of Bitcoin, Ethereum, Solana, and XRP from CoinGecko.
+    Fetches the current prices and 24-hour percentage changes of cryptocurrencies from CoinGecko.
+
+    Args:
+        crypto_ids (list): A list of cryptocurrency IDs to fetch data for.
 
     Returns:
         list: A list of dictionaries containing the cryptocurrency name, symbol, current price in USD,
               and 24-hour percentage change. Includes status for unavailable data.
-        dict: An error dictionary if the API request fails.
     """
     try:
-        # Define the cryptocurrencies to fetch using their CoinGecko IDs
-        # Note: 'ripple' is the CoinGecko ID for XRP
-        crypto_ids = ["bitcoin", "ethereum", "solana", "ripple"]
-        
         # CoinGecko API endpoint for simple price lookup
         url = "https://api.coingecko.com/api/v3/simple/price"
         
@@ -35,13 +26,13 @@ def fetch_crypto_prices() -> Union[List[Dict[str, Union[str, float, None]]], Dic
         }
 
         # Make the API request
-        response = requests.get(url, params=params, timeout=10)  # Added a timeout for robustness
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
 
         data = response.json()
 
         # Process the response to extract prices and 24-hour changes
-        results: List[Dict[str, Union[str, float, None]]] = []
+        results = []
         for crypto_id in crypto_ids:
             # Get the display name and symbol based on the crypto_id
             name_map = {
@@ -65,14 +56,14 @@ def fetch_crypto_prices() -> Union[List[Dict[str, Union[str, float, None]]], Dic
                     "name": crypto_name,
                     "symbol": crypto_symbol,
                     "price_usd": data[crypto_id]["usd"],
-                    "24hr_change_percent": data[crypto_id].get("usd_24h_change", None)
+                    "24hr_change_percent": round(data[crypto_id].get("usd_24h_change", 0), 2)
                 })
             else:
                 # If data for a specific crypto is not available
                 results.append({
                     "name": crypto_name,
                     "symbol": crypto_symbol,
-                    "price_usd": None,  # Explicitly None for missing price
+                    "price_usd": None,
                     "24hr_change_percent": None,
                     "status": "Data not available"
                 })
@@ -88,21 +79,22 @@ def fetch_crypto_prices() -> Union[List[Dict[str, Union[str, float, None]]], Dic
         # Catch any other unexpected errors
         return {"error": f"An unexpected error occurred: {str(e)}"}
 
-@app.get('/api/crypto-prices', response_model=List[Dict[str, Union[str, float, None]]])
-async def get_crypto_prices_endpoint():
+@app.route('/api/crypto-data', methods=['GET'])
+def get_crypto_data():
     """
-    API endpoint to fetch the current prices and 24-hour percentage changes of Bitcoin, Ethereum, Solana, and XRP.
+    API endpoint to fetch the current prices and 24-hour percentage changes of cryptocurrencies.
     """
-    data = fetch_crypto_prices()
-    
-    # If fetch_crypto_prices returns an error dictionary, raise an HTTPException
-    if isinstance(data, dict) and "error" in data:
-        raise HTTPException(status_code=500, detail=data["error"])
-    
-    return JSONResponse(content=data)
+    crypto_ids = ["bitcoin", "ethereum", "solana", "ripple"]  # Define the cryptocurrencies to fetch
+    data = fetch_crypto_data(crypto_ids)
 
-# To run this application:
-# 1. Save the code as a Python file (e.g., main.py).
-# 2. Make sure you have uvicorn installed: pip install uvicorn
-# 3. Run from your terminal: uvicorn main:app --reload --port 5004
-# 4. http://127.0.0.1:5004/api/crypto-prices
+    # If there's an error, return it with a 500 status code
+    if isinstance(data, dict) and "error" in data:
+        return jsonify({"error": data["error"]}), 500
+
+    return jsonify(data)
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5006)
+
+    # python .\get_crypto_data.py
+    # http://127.0.0.1:5006/api/crypto-data
