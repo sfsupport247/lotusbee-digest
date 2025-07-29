@@ -95,3 +95,8 @@ if __name__ == "__main__":
 
 # python.exe .\get_index_data.py
 # http://127.0.0.1:5001/api/index-data
+
+
+# git add .
+# git commit -m "Comment"
+# git push origin main
