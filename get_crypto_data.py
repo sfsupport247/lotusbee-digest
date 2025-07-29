@@ -105,3 +105,4 @@ async def get_crypto_prices_endpoint():
 # 1. Save the code as a Python file (e.g., main.py).
 # 2. Make sure you have uvicorn installed: pip install uvicorn
 # 3. Run from your terminal: uvicorn main:app --reload --port 5004
+# 4. http://127.0.0.1:5004/api/crypto-prices
