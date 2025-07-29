@@ -1,80 +1,65 @@
 import yfinance as yf
+from datetime import date, timedelta
 import pandas as pd
-import os
 
-# 1. Define index tickers
-indexes = {
-    "S&P 500": "^GSPC",
-    "Nasdaq Composite": "^IXIC",
-    "Dow Jones": "^DJI",
-    "Russell 2000": "^RUT"
-}
+def get_major_indexes_data():
+    """
+    Fetches data for major indexes from Yahoo Finance based on today's date.
+    Returns a formatted string with the latest close and percentage change.
+    """
+    try:
+        # Define today's date
+        today = date.today()
 
-# 2. Sample stock lists
-sp500_symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "PFE", "XOM", "KO"]
-russell_symbols = ["RBLX", "FUBO", "RITM", "MNDY", "IPI"]  # example Russell 2000 names
+        # Define the major indexes and their corresponding ETF tickers
+        indexes = {
+            "S&P 500 (via SPY)": "SPY",
+            "Nasdaq Composite (via QQQ)": "QQQ",
+            "Dow Jones Industrial Average (via DIA)": "DIA",
+            "Russell 2000 (via IWM)": "IWM"
+        }
 
-# 3. Fetch and format index data
-idx_data = []
-for name, sym in indexes.items():
-    info = yf.Ticker(sym).info
-    price = info.get("regularMarketPrice")
-    pct = info.get("regularMarketChangePercent")
-    idx_data.append({
-        "Index": name,
-        "Price": price,
-        "Change (%)": f"{pct:+.2f}%" if pct is not None else "N/A"
-    })
-df_idx = pd.DataFrame(idx_data)
+        # Fetch data for the last 7 days to ensure we capture the previous trading day
+        start_date = today - timedelta(days=7)
+        end_date = today + timedelta(days=1)  # End date is exclusive in yfinance
 
-# 4. Fetch S&P stock changes
-def get_changes(symbols):
-    stash = []
-    for sym in symbols:
-        info = yf.Ticker(sym).info
-        pct = info.get("regularMarketChangePercent", 0)
-        stash.append({"Symbol": sym,
-                      "Price": info.get("regularMarketPrice"),
-                      "Change (%)": pct})
-    return pd.DataFrame(stash)
+        output = []
+        for name, ticker in indexes.items():
+            print(f"Fetching data for {name} ({ticker})...")
+            data = yf.download(ticker, start=start_date, end=end_date, progress=False, auto_adjust=False)
 
-df_sp = get_changes(sp500_symbols)
-df_ru = get_changes(russell_symbols)
+            if not data.empty:
+                # Find the last available date before or equal to today
+                last_available_date = data.index[data.index <= pd.Timestamp(today)].max()
 
-df_sp_gainers = df_sp.nlargest(3, "Change (%)")
-df_sp_losers = df_sp.nsmallest(3, "Change (%)")
-df_ru_gainers = df_ru.nlargest(3, "Change (%)")
-df_ru_losers = df_ru.nsmallest(3, "Change (%)")
+                if pd.notna(last_available_date):  # Ensure a valid date is found
+                    latest_close = data.loc[last_available_date, 'Close']
 
-# 5. Print results
-print("📊 Major Indexes:")
-print(df_idx.to_string(index=False))
+                    # Check if there's a previous day for change calculation
+                    previous_date = data.index[data.index < last_available_date].max()
+                    if pd.notna(previous_date):  # Ensure a valid previous date is found
+                        previous_close = data.loc[previous_date, 'Close']
+                        change = latest_close - previous_close
+                        percent_change = (change / previous_close) * 100
+                        arrow = "▲" if change >= 0 else "▼"
+                        output.append(
+                            f"{name}: {latest_close:,.2f} {arrow} {percent_change:+.2f}%"
+                        )
+                    else:
+                        output.append(
+                            f"{name}: {latest_close:,.2f} (No previous day data for change calculation)"
+                        )
+                else:
+                    output.append(f"{name}: No data available for today.")
+            else:
+                output.append(f"{name}: No data downloaded for {ticker}.")
 
-print("\n🟢 Top 3 S&P 500 Gainers:")
-for _, r in df_sp_gainers.iterrows():
-    print(f"- {r.Symbol}: {r.Price} USD, {r['Change (%)']:+.2f}%")
+        return "\n".join(output)
 
-print("\n🔻 Top 3 S&P 500 Losers:")
-for _, r in df_sp_losers.iterrows():
-    print(f"- {r.Symbol}: {r.Price} USD, {r['Change (%)']:+.2f}%")
+    except Exception as e:
+        return f"An error occurred: {e}"
 
-print("\n🟢 Top 3 Russell 2000 Gainers:")
-for _, r in df_ru_gainers.iterrows():
-    print(f"- {r.Symbol}: {r.Price} USD, {r['Change (%)']:+.2f}%")
-
-print("\n🔻 Top 3 Russell 2000 Losers:")
-for _, r in df_ru_losers.iterrows():
-    print(f"- {r.Symbol}: {r.Price} USD, {r['Change (%)']:+.2f}%")
-
-
-# Example digest output
-digest_output = "📊 Major Indexes:\nS&P 500: 6,358.91 (+0.78%)\n..."
-
-# Save digest to docs/index.html
-with open("docs/index.html", "w", encoding="utf-8") as f:
-    f.write("<html><body>")
-    f.write("<h1>Lotusbee Market Digest</h1>")
-    f.write("<pre>")
-    f.write(digest_output)
-    f.write("</pre>")
-    f.write("</body></html>")
+if __name__ == "__main__":
+    # Fetch and print the major indexes data
+    result = get_major_indexes_data()
+    print(result)
